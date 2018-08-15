@@ -51,3 +51,14 @@ YO! And this is an annoying message that will happen AFTER every time a function
 ```
 
 Full source code of this particular extensions you may find [here](https://github.com/fnproject/fn-ext-example).
+
+## datastores / mqs / drivers
+
+Users that construct their own fn `main()` to build with extensions will need
+to import any pieces they need to configure a datastore, mq and drivers for
+the agent. `github.com/fnproject/fn/api/server/defaultexts` will import
+everything in core and allowing configuring them at runtime. To get a smaller
+binary, users may import only what they need. See the `defaultexts` file for
+import paths to various pieces that may be configured. It's also possible to
+use an entirely separate datastore, mq, or driver if a user wishes.
+
