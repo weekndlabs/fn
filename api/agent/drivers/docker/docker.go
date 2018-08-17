@@ -59,9 +59,28 @@ type DockerDriver struct {
 	hostname string
 	auths    map[string]driverAuthConfig
 	pool     DockerPool
+	imageLRU *Cache
 	// protects networks map
 	networksLock sync.Mutex
 	networks     map[string]uint64
+}
+
+func NewImageCleaner(dockerDriver *DockerDriver, toEvict <-chan docker.APIImages) error {
+	opts := docker.RemoveImageOptions{}
+	opts.Force = true
+	opts.NoPrune = false
+	for i := range toEvict {
+		dockerDriver.docker.RemoveImage(i.ID, opts)
+	}
+
+	return nil
+}
+
+func OnImageEvict(toEvict chan docker.APIImages) ImageEvictor {
+	return func(img docker.APIImages) error {
+		toEvict <- img
+		return nil
+	}
 }
 
 // implements drivers.Driver
@@ -80,7 +99,8 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 		conf:     conf,
 		docker:   newClient(),
 		hostname: hostname,
-		auths:    auths,
+		// XXX: MAGIC NUMBER, seems like 100 images is enough
+		auths: auths,
 	}
 
 	if conf.ServerVersion != "" {
@@ -102,10 +122,26 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 		}
 	}
 
+	imageEvictChan := make(chan docker.APIImages)
+	onEvictor := OnImageEvict(imageEvictChan)
+	go NewImageCleaner(driver, imageEvictChan)
+
+	//20GB
+	driver.imageLRU = NewLRU(1024*1024*1024*1024*20, onEvictor)
+
 	if conf.DockerLoadFile != "" {
 		err = loadDockerImages(driver, conf.DockerLoadFile)
 		if err != nil {
 			logrus.WithError(err).Fatalf("cannot load docker images in %s", conf.DockerLoadFile)
+		}
+
+		ctx, _ := common.LoggerWithFields(context.Background(), logrus.Fields{"stack": "listDockerImages"})
+		images, err := driver.docker.ListImages(ctx)
+		if err != nil {
+			logrus.WithError(err).Fatalf("cannot list docker images because: %v", err)
+		}
+		for _, img := range images {
+			driver.imageLRU.Add(img.ID, img)
 		}
 	}
 
