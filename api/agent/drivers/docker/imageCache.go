@@ -42,6 +42,7 @@ func (c *Cache) Add(key string, value d.APIImages) {
 	// Already in cache?
 	if ee, ok := c.cache[key]; ok {
 		c.ll.MoveToFront(ee)
+		c.totalSize = (c.totalSize - ee.Value.(d.APIImages).Size) + value.Size
 		ee.Value.(*entry).value = value
 		return
 	}
