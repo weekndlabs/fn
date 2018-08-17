@@ -26,10 +26,11 @@ type entry struct {
 }
 
 // New returns a new cache with the provided maximum items.
-func NewLRU(maxSize int, onEvict ImageEvictor) *Cache {
+func NewLRU(maxSize int64, onEvict ImageEvictor) *Cache {
 	return &Cache{
-		ll:    list.New(),
-		cache: make(map[string]*list.Element),
+		ll:      list.New(),
+		cache:   make(map[string]*list.Element),
+		onEvict: onEvict,
 	}
 }
 

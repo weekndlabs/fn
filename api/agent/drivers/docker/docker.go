@@ -134,7 +134,8 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 	go NewImageCleaner(driver, imageEvictChan)
 
 	//20GB
-	driver.imageLRU = NewLRU(1024*1024*1024*1024*20, onEvictor)
+	//	1024*1024*1024*1024*20
+	driver.imageLRU = NewLRU(int64(conf.MaxImageCacheSize), onEvictor)
 
 	if conf.DockerLoadFile != "" {
 		err = loadDockerImages(driver, conf.DockerLoadFile)
