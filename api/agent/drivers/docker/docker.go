@@ -67,10 +67,13 @@ type DockerDriver struct {
 
 func NewImageCleaner(dockerDriver *DockerDriver, toEvict <-chan docker.APIImages) error {
 	opts := docker.RemoveImageOptions{}
-	opts.Force = true
+	opts.Force = false
 	opts.NoPrune = false
 	for i := range toEvict {
-		dockerDriver.docker.RemoveImage(i.ID, opts)
+		err := dockerDriver.docker.RemoveImage(i.ID, opts)
+		if err != nil {
+			logrus.WithError(err).Errorf("Could not remove image: %v because: %v", i.ID, err)
+		}
 	}
 
 	return nil
