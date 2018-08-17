@@ -73,6 +73,7 @@ func NewImageCleaner(dockerDriver *DockerDriver, toEvict <-chan docker.APIImages
 		err := dockerDriver.docker.RemoveImage(i.ID, opts)
 		if err != nil {
 			logrus.WithError(err).Errorf("Could not remove image: %v because: %v", i.ID, err)
+			dockerDriver.imageLRU.Add(i.ID, i)
 		}
 	}
 
