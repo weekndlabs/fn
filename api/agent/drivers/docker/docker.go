@@ -125,27 +125,18 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 		}
 	}
 
+	driver.docker.PruneImages(context.Background())
 	imageEvictChan := make(chan docker.APIImages)
 	onEvictor := OnImageEvict(imageEvictChan)
 	go NewImageCleaner(driver, imageEvictChan)
 
 	//20GB
-	driver.conf.
-		driver.imageLRU = NewLRU(1024*1024*1024*1024*20, onEvictor)
+	driver.imageLRU = NewLRU(1024*1024*1024*1024*20, onEvictor)
 
 	if conf.DockerLoadFile != "" {
 		err = loadDockerImages(driver, conf.DockerLoadFile)
 		if err != nil {
 			logrus.WithError(err).Fatalf("cannot load docker images in %s", conf.DockerLoadFile)
-		}
-
-		ctx, _ := common.LoggerWithFields(context.Background(), logrus.Fields{"stack": "listDockerImages"})
-		images, err := driver.docker.ListImages(ctx)
-		if err != nil {
-			logrus.WithError(err).Fatalf("cannot list docker images because: %v", err)
-		}
-		for _, img := range images {
-			driver.imageLRU.Add(img.ID, img)
 		}
 	}
 

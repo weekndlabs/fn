@@ -41,6 +41,7 @@ type dockerClient interface {
 	InspectImage(ctx context.Context, name string) (*docker.Image, error)
 	ListImages(ctx context.Context) ([]docker.APIImages, error)
 	RemoveImage(id string, opts docker.RemoveImageOptions) error
+	PruneImages(ctx context.Context) (*docker.PruneImagesResults, error)
 	InspectContainerWithContext(container string, ctx context.Context) (*docker.Container, error)
 	Stats(opts docker.StatsOptions) error
 	Info(ctx context.Context) (*docker.DockerInfo, error)
@@ -183,7 +184,13 @@ func (d *dockerWrap) LoadImages(ctx context.Context, filePath string) error {
 func (d *dockerWrap) ListImages(ctx context.Context) ([]docker.APIImages, error) {
 	ctx, span := trace.StartSpan(ctx, "list_docker_images")
 	defer span.End()
-	return d.docker.ListImages(docker.ListImagesOptions{All: true})
+	return d.docker.ListImages(docker.ListImagesOptions{All: false})
+}
+
+func (d *dockerWrap) PruneImages(ctx context.Context) (*docker.PruneImagesResults, error) {
+	ctx, span := trace.StartSpan(ctx, "prune_docker_images")
+	defer span.End()
+	return d.docker.PruneImages(docker.PruneImagesOptions{})
 }
 
 func (d *dockerWrap) Info(ctx context.Context) (info *docker.DockerInfo, err error) {
