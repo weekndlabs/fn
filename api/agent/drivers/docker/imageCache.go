@@ -51,7 +51,7 @@ func (c *Cache) Add(key string, value d.APIImages) {
 	c.cache[key] = ele
 	c.totalSize += value.Size
 
-	if c.TotalSize() > c.maxSize {
+	for c.TotalSize() > c.maxSize {
 		c.removeOldest()
 	}
 }
