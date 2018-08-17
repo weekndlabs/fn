@@ -406,6 +406,8 @@ func (drv *DockerDriver) run(ctx context.Context, container string, task drivers
 	attachSuccess := make(chan struct{})
 	mwOut, mwErr := task.Logger()
 
+	drv.imageLRU.Get(container)
+
 	waiter, err := drv.docker.AttachToContainerNonBlocking(ctx, docker.AttachToContainerOptions{
 		Success:      attachSuccess,
 		Container:    container,
