@@ -99,8 +99,7 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 		conf:     conf,
 		docker:   newClient(),
 		hostname: hostname,
-		// XXX: MAGIC NUMBER, seems like 100 images is enough
-		auths: auths,
+		auths:    auths,
 	}
 
 	if conf.ServerVersion != "" {
