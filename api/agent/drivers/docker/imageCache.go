@@ -76,8 +76,8 @@ func (c *Cache) Get(key string) (value d.APIImages, ok bool) {
 // RemoveOldest removes the oldest item in the cache and returns its key and value.
 // If the cache is empty, the empty string and nil are returned.
 func (c *Cache) RemoveOldest() (key string, value d.APIImages) {
-	c.mu.Lock()
 	c.onEvict(value)
+	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.removeOldest()
 }
