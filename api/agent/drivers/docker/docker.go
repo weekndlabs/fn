@@ -135,13 +135,15 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 	//20GB
 	driver.imageLRU = NewLRU(int64(conf.MaxImageCacheSize), onEvictor)
 
-	images, err := driver.docker.ListImages(context.Background())
-	if err != nil {
-		logrus.WithError(err).Fatalf("cannot list docker images %s", err)
-	}
-	for _, i := range images {
-		driver.imageLRU.Add(i.ID, i)
-	}
+	go func() {
+		images, err := driver.docker.ListImages(context.Background())
+		if err != nil {
+			logrus.WithError(err).Fatalf("cannot list docker images %s", err)
+		}
+		for _, i := range images {
+			driver.imageLRU.Add(i.ID, i)
+		}
+	}()
 	if conf.DockerLoadFile != "" {
 		err = loadDockerImages(driver, conf.DockerLoadFile)
 		if err != nil {
