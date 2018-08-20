@@ -54,11 +54,13 @@ func (c *Cache) Add(key string, value d.APIImages) {
 	c.totalSize += value.Size
 
 	for c.TotalSize() > c.maxSize {
-		c.removeOldest()
+		c.RemoveOldest()
 	}
 }
 
 func (c *Cache) TotalSize() int64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.totalSize
 }
 
@@ -77,10 +79,11 @@ func (c *Cache) Get(key string) (value d.APIImages, ok bool) {
 // RemoveOldest removes the oldest item in the cache and returns its key and value.
 // If the cache is empty, the empty string and nil are returned.
 func (c *Cache) RemoveOldest() (key string, value d.APIImages) {
-	c.onEvict(value)
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.removeOldest()
+	k, v := c.removeOldest()
+	c.mu.Unlock()
+	c.onEvict(v)
+	return k, v
 }
 
 // note: must hold c.mu
