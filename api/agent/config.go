@@ -35,6 +35,7 @@ type Config struct {
 	DisableReadOnlyRootFs   bool          `json:"disable_readonly_rootfs"`
 	DisableTini             bool          `json:"disable_tini"`
 	DisableDebugUserLogs    bool          `json:"disable_debug_user_logs"`
+	MaxImageCacheSize       uint64        `json:"max_image_cache_size"`
 }
 
 const (
@@ -90,6 +91,7 @@ const (
 	// EnvDisableDebugUserLogs disables user function logs being logged at level debug. wise to enable for production.
 	EnvDisableDebugUserLogs = "FN_DISABLE_DEBUG_USER_LOGS"
 
+	EnvMaxImageCacheSize = "FN_MAX_IMAGE_CACHE_SIZE"
 	// MaxMsDisabled is used to determine whether mr freeze is lying in wait. TODO remove this manuever
 	MaxMsDisabled = time.Duration(math.MaxInt64)
 
@@ -108,6 +110,7 @@ func NewConfig() (*Config, error) {
 		MaxCallEndStacking: 8192,
 		PreForkImage:       "busybox",
 		PreForkCmd:         "tail -f /dev/null",
+		MaxImageCacheSize:  20 * 1024 * 1024,
 	}
 
 	var err error
@@ -125,6 +128,7 @@ func NewConfig() (*Config, error) {
 	err = setEnvUint(err, EnvMaxFsSize, &cfg.MaxFsSize)
 	err = setEnvUint(err, EnvPreForkPoolSize, &cfg.PreForkPoolSize)
 	err = setEnvUint(err, EnvMaxCallEndStacking, &cfg.MaxCallEndStacking)
+	err = setEnvUint(err, EnvMaxImageCacheSize, &cfg.MaxImageCacheSize)
 	err = setEnvStr(err, EnvPreForkImage, &cfg.PreForkImage)
 	err = setEnvStr(err, EnvPreForkCmd, &cfg.PreForkCmd)
 	err = setEnvUint(err, EnvPreForkUseOnce, &cfg.PreForkUseOnce)

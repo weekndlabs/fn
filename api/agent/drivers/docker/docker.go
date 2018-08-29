@@ -132,7 +132,7 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 	onEvictor := OnImageEvict(imageEvictChan)
 	go NewImageCleaner(driver, imageEvictChan)
 
-	//20GB
+	logrus.Infof("Max cache size: %v\n", conf.MaxImageCacheSize)
 	driver.imageLRU = NewLRU(int64(conf.MaxImageCacheSize), onEvictor)
 
 	go func() {
