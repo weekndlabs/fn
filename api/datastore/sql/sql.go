@@ -991,8 +991,8 @@ func (ds *SQLStore) GetCall(ctx context.Context, appID, callID string) (*models.
 	return &call, nil
 }
 
-func (ds *SQLStore) GetCalls(ctx context.Context, filter *models.CallFilter) ([]*models.Call, error) {
-	res := []*models.Call{}
+func (ds *SQLStore) GetCalls(ctx context.Context, filter *models.CallFilter) (*models.CallList, error) {
+	res := &models.CallList{Items: []*models.Call{}}
 	query, args := buildFilterCallQuery(filter)
 	query = fmt.Sprintf("%s %s", callSelector, query)
 	query = ds.db.Rebind(query)
@@ -1008,7 +1008,7 @@ func (ds *SQLStore) GetCalls(ctx context.Context, filter *models.CallFilter) ([]
 		if err != nil {
 			continue
 		}
-		res = append(res, &call)
+		res.Items = append(res.Items, &call)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

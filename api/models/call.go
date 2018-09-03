@@ -168,3 +168,8 @@ type CallFilter struct {
 	Cursor   string
 	PerPage  int
 }
+
+type CallList struct {
+	NextCursor string  `json:"next_cursor, omitempty"`
+	Items      []*Call `json:"items"`
+}

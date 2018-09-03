@@ -25,11 +25,12 @@ type LogStore interface {
 	InsertCall(ctx context.Context, call *Call) error
 
 	// GetCall returns a call at a certain id and app name.
+
 	GetCall(ctx context.Context, appId, callID string) (*Call, error)
 
 	// GetCalls returns a list of calls that satisfy the given CallFilter. If no
 	// calls exist, an empty list and a nil error are returned.
-	GetCalls(ctx context.Context, filter *CallFilter) ([]*Call, error)
+	GetCalls(ctx context.Context, filter *CallFilter) (*CallList, error)
 
 	// Close will close any underlying connections as needed.
 	// Close is not safe to be called from multiple threads.

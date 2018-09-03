@@ -7,14 +7,14 @@ import (
 	"io/ioutil"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/fnproject/fn/api/models"
 )
 
 type mock struct {
-	Logs  map[string][]byte
-	Calls []*models.Call
+	Logs      map[string][]byte
+	Calls     []*models.Call
+	CallsList *models.CallList
 }
 
 func NewMock(args ...interface{}) models.LogStore {
@@ -23,6 +23,8 @@ func NewMock(args ...interface{}) models.LogStore {
 		switch x := a.(type) {
 		case []*models.Call:
 			mocker.Calls = x
+		case *models.CallList:
+			mocker.CallsList = x
 		default:
 			panic("unknown type handed to mocker. add me")
 		}
@@ -66,26 +68,25 @@ func (s sortC) Len() int           { return len(s) }
 func (s sortC) Less(i, j int) bool { return strings.Compare(s[i].ID, s[j].ID) < 0 }
 func (s sortC) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
-func (m *mock) GetCalls(ctx context.Context, filter *models.CallFilter) ([]*models.Call, error) {
+func (m *mock) GetCalls(ctx context.Context, filter *models.CallFilter) (*models.CallList, error) {
 	// sort them all first for cursoring (this is for testing, n is small & mock is not concurrent..)
 	// calls are in DESC order so use sort.Reverse
 	sort.Sort(sort.Reverse(sortC(m.Calls)))
 
-	var calls []*models.Call
-	for _, c := range m.Calls {
-		if len(calls) == filter.PerPage {
-			break
-		}
+	var calls *models.CallList
+	// for i, c := range m.CallsList {
+	// 	if len(calls) == filter.PerPage {
+	// 		break
+	// 	}
 
-		if (filter.AppID == "" || c.AppID == filter.AppID) &&
-			(filter.Path == "" || filter.Path == c.Path) &&
-			(time.Time(filter.FromTime).IsZero() || time.Time(filter.FromTime).Before(time.Time(c.CreatedAt))) &&
-			(time.Time(filter.ToTime).IsZero() || time.Time(c.CreatedAt).Before(time.Time(filter.ToTime))) &&
-			(filter.Cursor == "" || strings.Compare(filter.Cursor, c.ID) > 0) {
+	// 	if (filter.AppID == "" || c.Items[i].AppID == filter.AppID) &&
+	// 		(time.Time(filter.FromTime).IsZero() || time.Time(filter.FromTime).Before(time.Time(c.Items[i].CreatedAt))) &&
+	// 		(time.Time(filter.ToTime).IsZero() || time.Time(c.Items[i].CreatedAt).Before(time.Time(filter.ToTime))) {
+	// 		// (filter.Cursor == "" || strings.Compare(filter.Cursor, c.Items[i].Annotations) > 0)
 
-			calls = append(calls, c)
-		}
-	}
+	// 		calls = append(calls, c)
+	// 	}
+	// }
 
 	return calls, nil
 }

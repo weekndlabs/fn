@@ -28,7 +28,7 @@ func (m *metricls) GetCall(ctx context.Context, appName, callID string) (*models
 	return m.ls.GetCall(ctx, appName, callID)
 }
 
-func (m *metricls) GetCalls(ctx context.Context, filter *models.CallFilter) ([]*models.Call, error) {
+func (m *metricls) GetCalls(ctx context.Context, filter *models.CallFilter) (*models.CallList, error) {
 	ctx, span := trace.StartSpan(ctx, "ls_get_calls")
 	defer span.End()
 	return m.ls.GetCalls(ctx, filter)

@@ -299,7 +299,7 @@ func logKey(appID, callID string) string {
 // GetCalls returns a list of calls that satisfy the given CallFilter. If no
 // calls exist, an empty list and a nil error are returned.
 // NOTE: this relies on call ids being lexicographically sortable and <= 16 byte
-func (s *store) GetCalls(ctx context.Context, filter *models.CallFilter) ([]*models.Call, error) {
+func (s *store) GetCalls(ctx context.Context, filter *models.CallFilter) (*models.CallList, error) {
 	ctx, span := trace.StartSpan(ctx, "s3_get_calls")
 	defer span.End()
 
@@ -365,59 +365,62 @@ func (s *store) GetCalls(ctx context.Context, filter *models.CallFilter) ([]*mod
 		return nil, fmt.Errorf("failed to list logs: %v", err)
 	}
 
-	calls := make([]*models.Call, 0, len(result.Contents))
+	fmt.Println("Results: ", result)
 
-	for _, obj := range result.Contents {
-		if len(calls) == filter.PerPage {
-			break
-		}
+	// var calls *models.CallList
+	// calls.Items = make(map[string]*models.Call)
 
-		// extract the app and id from the key to lookup the object, this also
-		// validates we aren't reading strangely keyed objects from the bucket.
-		var app, id string
-		if filter.Path != "" {
-			fields := strings.Split(*obj.Key, "/")
-			if len(fields) != 4 {
-				return calls, fmt.Errorf("invalid key in call markers: %v", *obj.Key)
-			}
-			app = fields[1]
-			id = fields[3]
-		} else {
-			fields := strings.Split(*obj.Key, "/")
-			if len(fields) != 3 {
-				return calls, fmt.Errorf("invalid key in calls: %v", *obj.Key)
-			}
-			app = fields[1]
-			id = fields[2]
-		}
+	// for _, obj := range result.Contents {
+	// 	if len(calls.Items) == filter.PerPage {
+	// 		break
+	// 	}
 
-		// the id here is already reverse encoded, keep it that way.
-		objectName := callKeyFlipped(app, id)
+	// 	// extract the app and id from the key to lookup the object, this also
+	// 	// validates we aren't reading strangely keyed objects from the bucket.
+	// 	var app, id string
+	// 	if filter.Path != "" {
+	// 		fields := strings.Split(*obj.Key, "/")
+	// 		if len(fields) != 4 {
+	// 			return calls, fmt.Errorf("invalid key in call markers: %v", *obj.Key)
+	// 		}
+	// 		app = fields[1]
+	// 		id = fields[3]
+	// 	} else {
+	// 		fields := strings.Split(*obj.Key, "/")
+	// 		if len(fields) != 3 {
+	// 			return calls, fmt.Errorf("invalid key in calls: %v", *obj.Key)
+	// 		}
+	// 		app = fields[1]
+	// 		id = fields[2]
+	// 	}
 
-		// NOTE: s3 doesn't have a way to get multiple objects so just use GetCall
-		// TODO we should reuse the buffer to decode these
-		call, err := s.getCallByKey(ctx, objectName)
-		if err != nil {
-			common.Logger(ctx).WithError(err).WithFields(logrus.Fields{"app": app, "id": id}).Error("error filling call object")
-			continue
-		}
+	// 	// the id here is already reverse encoded, keep it that way.
+	// 	objectName := callKeyFlipped(app, id)
 
-		// ensure: from_time < created_at < to_time
-		fromTime := time.Time(filter.FromTime).Truncate(time.Millisecond)
-		if !fromTime.IsZero() && !fromTime.Before(time.Time(call.CreatedAt)) {
-			// NOTE could break, ids and created_at aren't necessarily in perfect order
-			continue
-		}
+	// 	// NOTE: s3 doesn't have a way to get multiple objects so just use GetCall
+	// 	// TODO we should reuse the buffer to decode these
+	// 	call, err := s.getCallByKey(ctx, objectName)
+	// 	if err != nil {
+	// 		common.Logger(ctx).WithError(err).WithFields(logrus.Fields{"app": app, "id": id}).Error("error filling call object")
+	// 		continue
+	// 	}
 
-		toTime := time.Time(filter.ToTime).Truncate(time.Millisecond)
-		if !toTime.IsZero() && !time.Time(call.CreatedAt).Before(toTime) {
-			continue
-		}
+	// 	// ensure: from_time < created_at < to_time
+	// 	fromTime := time.Time(filter.FromTime).Truncate(time.Millisecond)
+	// 	if !fromTime.IsZero() && !fromTime.Before(time.Time(call.CreatedAt)) {
+	// 		// NOTE could break, ids and created_at aren't necessarily in perfect order
+	// 		continue
+	// 	}
 
-		calls = append(calls, call)
-	}
+	// 	toTime := time.Time(filter.ToTime).Truncate(time.Millisecond)
+	// 	if !toTime.IsZero() && !time.Time(call.CreatedAt).Before(toTime) {
+	// 		continue
+	// 	}
 
-	return calls, nil
+	// 	calls = append(calls, call)
+	// }
+
+	return nil, nil
 }
 
 func (s *store) Close() error {
