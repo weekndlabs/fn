@@ -38,7 +38,6 @@ func NewLRU(maxSize int64, onEvict ImageEvictor) *Cache {
 // an old item if necessary.
 func (c *Cache) Add(key string, value d.APIImages) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	// Already in cache?
 	if ee, ok := c.cache[key]; ok {
@@ -52,6 +51,7 @@ func (c *Cache) Add(key string, value d.APIImages) {
 	ele := c.ll.PushFront(&entry{key, value})
 	c.cache[key] = ele
 	c.totalSize += value.Size
+	c.mu.Unlock()
 
 	for c.TotalSize() > c.maxSize {
 		c.RemoveOldest()

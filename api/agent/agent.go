@@ -218,6 +218,7 @@ func NewDockerDriver(cfg *Config) (drivers.Driver, error) {
 		PreForkUseOnce:       cfg.PreForkUseOnce,
 		PreForkNetworks:      cfg.PreForkNetworks,
 		MaxTmpFsInodes:       cfg.MaxTmpFsInodes,
+		MaxImageCacheSize:    cfg.MaxImageCacheSize,
 		EnableReadOnlyRootFs: !cfg.DisableReadOnlyRootFs,
 		EnableTini:           !cfg.DisableTini,
 	})

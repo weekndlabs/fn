@@ -69,9 +69,11 @@ func NewImageCleaner(dockerDriver *DockerDriver, toEvict <-chan docker.APIImages
 	opts := docker.RemoveImageOptions{}
 	opts.Force = false
 	opts.NoPrune = false
+	opts.Context = context.Background()
 	rateLimiter := time.NewTimer(time.Second)
 	for i := range toEvict {
 		<-rateLimiter.C
+
 		err := dockerDriver.docker.RemoveImage(i.ID, opts)
 		rateLimiter.Reset(time.Second)
 		if err != nil {

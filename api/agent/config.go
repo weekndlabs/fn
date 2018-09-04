@@ -90,7 +90,7 @@ const (
 	EnvDisableTini = "FN_DISABLE_TINI"
 	// EnvDisableDebugUserLogs disables user function logs being logged at level debug. wise to enable for production.
 	EnvDisableDebugUserLogs = "FN_DISABLE_DEBUG_USER_LOGS"
-
+	// EnvMaxImageCacheSize
 	EnvMaxImageCacheSize = "FN_MAX_IMAGE_CACHE_SIZE"
 	// MaxMsDisabled is used to determine whether mr freeze is lying in wait. TODO remove this manuever
 	MaxMsDisabled = time.Duration(math.MaxInt64)
