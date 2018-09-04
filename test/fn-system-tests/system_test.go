@@ -258,6 +258,7 @@ func SetUpPureRunnerNode(ctx context.Context, nodeNum int) (*server.Server, erro
 
 	// This is our Agent config, which we will use for both inner agent and docker.
 	cfg, err := agent.NewConfig()
+	cfg.MaxImageCacheSize = 1024 * 1024 * 1024
 	if err != nil {
 		return nil, err
 	}
