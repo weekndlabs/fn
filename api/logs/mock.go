@@ -33,13 +33,13 @@ func NewMock(args ...interface{}) models.LogStore {
 	return &mocker
 }
 
-func (m *mock) InsertLog(ctx context.Context, appID, callID string, callLog io.Reader) error {
+func (m *mock) InsertLog(ctx context.Context, appID, fnID, callID string, callLog io.Reader) error {
 	bytes, err := ioutil.ReadAll(callLog)
 	m.Logs[callID] = bytes
 	return err
 }
 
-func (m *mock) GetLog(ctx context.Context, appID, callID string) (io.Reader, error) {
+func (m *mock) GetLog(ctx context.Context, callID string) (io.Reader, error) {
 	logEntry, ok := m.Logs[callID]
 	if !ok {
 		return nil, models.ErrCallLogNotFound
@@ -52,9 +52,9 @@ func (m *mock) InsertCall(ctx context.Context, call *models.Call) error {
 	return nil
 }
 
-func (m *mock) GetCall(ctx context.Context, appID, callID string) (*models.Call, error) {
+func (m *mock) GetCall(ctx context.Context, callID string) (*models.Call, error) {
 	for _, t := range m.Calls {
-		if t.ID == callID && t.AppID == appID {
+		if t.ID == callID {
 			return t, nil
 		}
 	}

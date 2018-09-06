@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/fnproject/fn/api"
 	"github.com/fnproject/fn/api/common"
 	"github.com/fnproject/fn/api/models"
 	"github.com/gin-gonic/gin"
@@ -16,7 +17,8 @@ func (s *Server) handleCallList(c *gin.Context) {
 	var err error
 
 	filter.Cursor, filter.PerPage = pageParamsV2(c)
-	filter.AppID = c.Query("app_id")
+	filter.AppID = c.Query(api.AppID)
+	filter.FnID = c.Query("fn_id")
 
 	filter.FromTime, filter.ToTime, err = timeParams(c)
 	if err != nil {

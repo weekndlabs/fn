@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -136,13 +137,14 @@ func (s3StoreProvider) New(ctx context.Context, u *url.URL) (models.LogStore, er
 	return store, nil
 }
 
-func (s *store) InsertLog(ctx context.Context, appID, callID string, callLog io.Reader) error {
+func (s *store) InsertLog(ctx context.Context, appID, fnID, callID string, callLog io.Reader) error {
+	debug.PrintStack()
 	ctx, span := trace.StartSpan(ctx, "s3_insert_log")
 	defer span.End()
 
 	// wrap original reader in a decorator to keep track of read bytes without buffering
 	cr := &countingReader{r: callLog}
-	objectName := logKey(appID, callID)
+	objectName := logKey(callID)
 	params := &s3manager.UploadInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(objectName),
@@ -160,11 +162,11 @@ func (s *store) InsertLog(ctx context.Context, appID, callID string, callLog io.
 	return nil
 }
 
-func (s *store) GetLog(ctx context.Context, appID, callID string) (io.Reader, error) {
+func (s *store) GetLog(ctx context.Context, callID string) (io.Reader, error) {
 	ctx, span := trace.StartSpan(ctx, "s3_get_log")
 	defer span.End()
 
-	objectName := logKey(appID, callID)
+	objectName := logKey(callID)
 	logrus.WithFields(logrus.Fields{"bucketName": s.bucket, "key": objectName}).Debug("Downloading log")
 
 	// stream the logs to an in-memory buffer
@@ -186,6 +188,7 @@ func (s *store) GetLog(ctx context.Context, appID, callID string) (io.Reader, er
 }
 
 func (s *store) InsertCall(ctx context.Context, call *models.Call) error {
+	fmt.Println("Datastore Call: ", call)
 	ctx, span := trace.StartSpan(ctx, "s3_insert_call")
 	defer span.End()
 
@@ -194,7 +197,7 @@ func (s *store) InsertCall(ctx context.Context, call *models.Call) error {
 		return err
 	}
 
-	objectName := callKey(call.AppID, call.ID)
+	objectName := callKey(call.ID)
 	params := &s3manager.UploadInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(objectName),
@@ -232,11 +235,11 @@ func (s *store) InsertCall(ctx context.Context, call *models.Call) error {
 }
 
 // GetCall returns a call at a certain id and app name.
-func (s *store) GetCall(ctx context.Context, appID, callID string) (*models.Call, error) {
+func (s *store) GetCall(ctx context.Context, callID string) (*models.Call, error) {
 	ctx, span := trace.StartSpan(ctx, "s3_get_call")
 	defer span.End()
 
-	objectName := callKey(appID, callID)
+	objectName := callKey(callID)
 	logrus.WithFields(logrus.Fields{"bucketName": s.bucket, "key": objectName}).Debug("Downloading call")
 
 	return s.getCallByKey(ctx, objectName)
@@ -283,17 +286,17 @@ func callMarkerKey(app, path, id string) string {
 	return callMarkerPrefix + app + "/" + path + "/" + id
 }
 
-func callKey(app, id string) string {
+func callKey(id string) string {
 	id = flipCursor(id)
-	return callKeyFlipped(app, id)
+	return callKeyFlipped(id)
 }
 
-func callKeyFlipped(app, id string) string {
-	return callKeyPrefix + app + "/" + id
+func callKeyFlipped(id string) string {
+	return callKeyPrefix + "/" + id
 }
 
-func logKey(appID, callID string) string {
-	return logKeyPrefix + appID + "/" + callID
+func logKey(callID string) string {
+	return logKeyPrefix + "/" + callID
 }
 
 // GetCalls returns a list of calls that satisfy the given CallFilter. If no
@@ -303,8 +306,8 @@ func (s *store) GetCalls(ctx context.Context, filter *models.CallFilter) (*model
 	ctx, span := trace.StartSpan(ctx, "s3_get_calls")
 	defer span.End()
 
-	if filter.AppID == "" {
-		return nil, errors.New("s3 store does not support listing across all apps")
+	if filter.FnID == "" {
+		return nil, errors.New("s3 store does not support listing across all functions")
 	}
 
 	// NOTE:
@@ -330,9 +333,9 @@ func (s *store) GetCalls(ctx context.Context, filter *models.CallFilter) (*model
 	// filter.Cursor is a call id, translate to our key format. if a path is
 	// provided, we list keys from markers instead.
 	if filter.Cursor != "" {
-		marker = callKey(filter.AppID, filter.Cursor)
+		marker = callKey(filter.Cursor)
 		if filter.Path != "" {
-			marker = callMarkerKey(filter.AppID, filter.Path, filter.Cursor)
+			marker = callMarkerKey(filter.FnID, filter.Path, filter.Cursor)
 		}
 	} else if t := time.Time(filter.ToTime); !t.IsZero() {
 		// get a fake id that has the most significant bits set to the to_time (first 48 bits)
@@ -341,16 +344,16 @@ func (s *store) GetCalls(ctx context.Context, filter *models.CallFilter) (*model
 		//fakoId.MarshalTextTo(buf)
 		//mid := string(buf[:10])
 		mid := fako.String()
-		marker = callKey(filter.AppID, mid)
+		marker = callKey(mid)
 		if filter.Path != "" {
-			marker = callMarkerKey(filter.AppID, filter.Path, mid)
+			marker = callMarkerKey(filter.FnID, filter.Path, mid)
 		}
 	}
 
 	// prefix prevents leaving bounds of app or path marker keys
-	prefix := callKey(filter.AppID, "")
+	prefix := callKey("")
 	if filter.Path != "" {
-		prefix = callMarkerKey(filter.AppID, filter.Path, "")
+		prefix = callMarkerKey(filter.FnID, filter.Path, "")
 	}
 
 	input := &s3.ListObjectsInput{

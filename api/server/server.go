@@ -1117,7 +1117,7 @@ func (s *Server) bindHandlers(ctx context.Context) {
 			v2.GET("/calls", s.handleCallList)
 			v2.GET("/calls/:callID", s.handleCallGet)
 
-			v2.GET("/log/:callID", s.handleCallLogGet)
+			v2.GET("/log", s.handleCallLogGet)
 		}
 
 		if !s.noHybridAPI { // Hybrid API - this should only be enabled on API servers

@@ -163,6 +163,7 @@ type Call struct {
 type CallFilter struct {
 	Path     string // match
 	AppID    string // match
+	FnID     string // match
 	FromTime common.DateTime
 	ToTime   common.DateTime
 	Cursor   string

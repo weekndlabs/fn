@@ -145,16 +145,15 @@ paths:
           schema:
             $ref: '#/definitions/Error'
 
-  /logs:
+  /log:
     get:
       operationId: "GetCallLogs"
       summary: "Get Call Logs For An Application."
-      description: "Returns the call logs for a specific Application."
+      description: "Returns the call logs for a specific Call."
       tags:
         - Call
         - Log
       parameters:
-        - $ref: '#/parameters/AppIDQuery'
         - $ref: '#/parameters/CallIDQuery'
       responses:
         200:
@@ -174,6 +173,7 @@ paths:
         - Call
       parameters:
         - $ref: '#/parameters/AppIDQuery'
+        - $ref: '#/parameters/FnIDQuery'
         - $ref: '#/parameters/cursor'
         - $ref: '#/parameters/perPage'
         - name: from_time
@@ -203,7 +203,6 @@ paths:
       tags:
         - Call
       parameters:
-        - $ref: '#/parameters/AppIDQuery'
         - $ref: '#/parameters/CallID'
       responses:
         200:

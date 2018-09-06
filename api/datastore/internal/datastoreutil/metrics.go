@@ -149,12 +149,6 @@ func (m *metricds) RemoveFn(ctx context.Context, fnID string) error {
 	return m.ds.RemoveFn(ctx, fnID)
 }
 
-// func (m *metricds) GetCalls(ctx context.Context, filter *models.CallFilter) (*models.CallList, error) {
-// 	ctx, span := trace.StartSpan(ctx, "ds_get_calls")
-// 	defer span.End()
-// 	return m.ds.GetCalls(ctx, filter)
-// }
-
 // Close calls Close on the underlying Datastore
 func (m *metricds) Close() error {
 	return m.ds.Close()
