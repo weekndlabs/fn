@@ -54,17 +54,25 @@ func NewCache(maxSize int64) *Cache {
 func (c *Cache) Contains(value d.APIImages) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.contains(value)
+}
+
+func (c *Cache) contains(value d.APIImages) bool {
 	for _, i := range c.cache {
 		if i.image.ID == value.ID {
 			return true
 		}
 	}
 	return false
-}
 
+}
 func (c *Cache) Mark(ID string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.mark(ID)
+}
+
+func (c *Cache) mark(ID string) error {
 	for idx, i := range c.cache {
 		if i.image.ID == ID {
 			c.cache[idx].lastUsed = time.Now()
@@ -95,6 +103,10 @@ func (c *Cache) Remove(value d.APIImages) error {
 func (c *Cache) Lock(ID string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.lock(ID)
+}
+
+func (c *Cache) lock(ID string) error {
 	for _, i := range c.cache {
 		if i.image.ID == ID {
 			i.locked = true
@@ -107,6 +119,10 @@ func (c *Cache) Lock(ID string) error {
 func (c *Cache) Locked(value d.APIImages) (bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.locked(value)
+}
+
+func (c *Cache) locked(value d.APIImages) (bool, error) {
 	for _, i := range c.cache {
 		if i.image.ID == value.ID {
 			return i.locked, nil
@@ -118,6 +134,11 @@ func (c *Cache) Locked(value d.APIImages) (bool, error) {
 func (c *Cache) Unlock(value d.APIImages) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.unlock(value)
+
+}
+
+func (c *Cache) unlock(value d.APIImages) {
 	for _, i := range c.cache {
 		if i.image.ID == value.ID {
 			i.locked = false
@@ -131,8 +152,8 @@ func (c *Cache) Add(value d.APIImages) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	logrus.Debugf("value: %v", value)
-	if c.Contains(value) {
-		c.Mark(value.ID)
+	if c.contains(value) {
+		c.mark(value.ID)
 		return
 	}
 	c.cache = append(c.cache, NewEntry(value))
@@ -150,8 +171,13 @@ func (c *Cache) OverFilled() bool {
 	defer c.mu.Unlock()
 	return c.totalSize < c.maxSize
 }
+func (c *Cache) Evictable() EntryByAge {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.evictable()
+}
 
-func (c *Cache) Evictable() (ea EntryByAge) {
+func (c *Cache) evictable() (ea EntryByAge) {
 	for _, i := range c.cache {
 		if i.locked == false {
 			ea = append(ea, i)
