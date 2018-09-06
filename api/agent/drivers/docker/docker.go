@@ -70,14 +70,14 @@ func NewImageCleaner(dockerDriver *DockerDriver, context context.Context) error 
 	opts.Force = true
 	opts.NoPrune = false
 	opts.Context = context
-	timer := time.NewTimer(time.Minute * 5)
+	ticker := time.NewTicker(time.Minute * 5)
 	for {
 		select {
 		case <-context.Done():
 			{
 				return nil
 			}
-		case <-timer.C:
+		case <-ticker.C:
 			{
 				if !dockerDriver.imageCache.OverFilled() {
 					continue
@@ -91,7 +91,6 @@ func NewImageCleaner(dockerDriver *DockerDriver, context context.Context) error 
 						dockerDriver.imageCache.Remove(i.image)
 					}
 				}
-				timer.Reset(time.Minute * 5)
 			}
 
 		}

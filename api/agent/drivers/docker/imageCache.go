@@ -141,7 +141,7 @@ func (c *Cache) Unlock(value d.APIImages, key interface{}) {
 func (c *Cache) unlock(value d.APIImages, key interface{}) {
 	for _, i := range c.cache {
 		if i.image.ID == value.ID {
-			remove(i.locked, key)
+			delete(i.locked, &key)
 		}
 	}
 }
@@ -179,7 +179,7 @@ func (c *Cache) Evictable() EntryByAge {
 
 func (c *Cache) evictable() (ea EntryByAge) {
 	for _, i := range c.cache {
-		if i.locked == false {
+		if len(i.locked) == 0 {
 			ea = append(ea, i)
 		}
 	}
