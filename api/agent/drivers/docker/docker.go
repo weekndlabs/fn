@@ -145,9 +145,6 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 		}
 	}
 
-	logrus.Infof("Max cache size: %v\n", conf.MaxImageCacheSize)
-	driver.imageCache = NewCache(int64(conf.MaxImageCacheSize))
-
 	imagesBeforeLoad, err := driver.docker.ListImages(context.Background())
 
 	if conf.DockerLoadFile != "" {
@@ -157,21 +154,25 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 		}
 	}
 
-	go func() {
-		images, err := driver.docker.ListImages(context.Background())
-		if err != nil {
-			logrus.WithError(err).Fatalf("cannot list docker images %s", err)
-		}
-		for _, i := range images {
-			if Contains(imagesBeforeLoad, i) {
-				driver.imageCache.Add(i)
-			} else {
-				driver.imageCache.Lock(i.ID, "baseimage")
-			}
-		}
-	}()
+	if conf.MaxImageCacheSize != 0 {
+		driver.imageCache = NewCache(int64(conf.MaxImageCacheSize))
 
-	go NewImageCleaner(driver, context.Background())
+		go func() {
+			images, err := driver.docker.ListImages(context.Background())
+			if err != nil {
+				logrus.WithError(err).Fatalf("cannot list docker images %s", err)
+			}
+			for _, i := range images {
+				if Contains(imagesBeforeLoad, i) {
+					driver.imageCache.Add(i)
+				} else {
+					driver.imageCache.Lock(i.ID, "baseimage")
+				}
+			}
+		}()
+
+		go NewImageCleaner(driver, context.Background())
+	}
 
 	return driver
 }

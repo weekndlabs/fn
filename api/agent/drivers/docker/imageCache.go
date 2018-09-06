@@ -159,13 +159,15 @@ func (c *Cache) Add(value d.APIImages) {
 }
 
 func (c *Cache) TotalSize() int64 {
-	d.Dsi
+	return 0
 }
 
 func (c *Cache) OverFilled() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.TotalSize() > c.maxSize
 }
+
 func (c *Cache) Evictable() EntryByAge {
 	c.mu.Lock()
 	defer c.mu.Unlock()
