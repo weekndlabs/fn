@@ -1,61 +1,142 @@
 package docker
 
 import (
-	"container/list"
+	"errors"
+	"sort"
 	"sync"
+	"time"
 
 	d "github.com/fsouza/go-dockerclient"
+	"github.com/sirupsen/logrus"
 )
-
-type ImageEvictor func(d.APIImages) error
 
 // Cache is an LRU cache, safe for concurrent access.
 type Cache struct {
 	totalSize int64
 	mu        sync.Mutex
-	ll        *list.List
-	cache     map[string]*list.Element
+	cache     EntryByAge
 	maxSize   int64
-	onEvict   ImageEvictor
 }
 
-// *entry is the type stored in each *list.Element.
-type entry struct {
-	key   string
-	value d.APIImages
+type Entry struct {
+	lastUsed time.Time
+	locked   bool
+	uses     int64
+	image    d.APIImages
+}
+
+func (e Entry) Score() int64 {
+	age := time.Now().Sub(e.lastUsed)
+	return age.Nanoseconds() / e.uses
+}
+
+type EntryByAge []Entry
+
+func (a EntryByAge) Len() int           { return len(a) }
+func (a EntryByAge) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a EntryByAge) Less(i, j int) bool { return a[i].Score() < a[j].Score() }
+
+func NewEntry(value d.APIImages) Entry {
+	return Entry{
+		lastUsed: time.Now(),
+		locked:   false,
+		uses:     0,
+		image:    value}
 }
 
 // New returns a new cache with the provided maximum items.
-func NewLRU(maxSize int64, onEvict ImageEvictor) *Cache {
+func NewCache(maxSize int64) *Cache {
 	return &Cache{
-		ll:      list.New(),
-		cache:   make(map[string]*list.Element),
-		onEvict: onEvict,
+		cache: make(EntryByAge, 0),
+	}
+}
+
+func (c *Cache) Contains(value d.APIImages) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, i := range c.cache {
+		if i.image.ID == value.ID {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Cache) Mark(ID string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for idx, i := range c.cache {
+		if i.image.ID == ID {
+			c.cache[idx].lastUsed = time.Now()
+			c.cache[idx].uses = c.cache[idx].uses + 1
+			return nil
+		}
+	}
+
+	return errors.New("Image not found in cache")
+}
+
+func (c *Cache) Remove(value d.APIImages) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for idx, i := range c.cache {
+		if i.image.ID == value.ID {
+			// Move the last item into the location of the item to be removed
+			c.cache[idx] = c.cache[len(c.cache)-1]
+			// shorten the list
+			c.cache = c.cache[:len(c.cache)-1]
+			return nil
+		}
+	}
+
+	return errors.New("Image not found in cache")
+}
+
+func (c *Cache) Lock(ID string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, i := range c.cache {
+		if i.image.ID == ID {
+			i.locked = true
+			return nil
+		}
+	}
+	return errors.New("Image not found in cache")
+}
+
+func (c *Cache) Locked(value d.APIImages) (bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, i := range c.cache {
+		if i.image.ID == value.ID {
+			return i.locked, nil
+		}
+	}
+	return false, errors.New("Image not found in cache")
+}
+
+func (c *Cache) Unlock(value d.APIImages) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, i := range c.cache {
+		if i.image.ID == value.ID {
+			i.locked = false
+		}
 	}
 }
 
 // Add adds the provided key and value to the cache, evicting
 // an old item if necessary.
-func (c *Cache) Add(key string, value d.APIImages) {
+func (c *Cache) Add(value d.APIImages) {
 	c.mu.Lock()
-
-	// Already in cache?
-	if ee, ok := c.cache[key]; ok {
-		c.ll.MoveToFront(ee)
-		c.totalSize = (c.totalSize - ee.Value.(d.APIImages).Size) + value.Size
-		ee.Value.(*entry).value = value
+	defer c.mu.Unlock()
+	logrus.Debugf("value: %v", value)
+	if c.Contains(value) {
+		c.Mark(value.ID)
 		return
 	}
-
-	// Add to cache if not present
-	ele := c.ll.PushFront(&entry{key, value})
-	c.cache[key] = ele
+	c.cache = append(c.cache, NewEntry(value))
 	c.totalSize += value.Size
-	c.mu.Unlock()
-
-	for c.TotalSize() > c.maxSize {
-		c.RemoveOldest()
-	}
 }
 
 func (c *Cache) TotalSize() int64 {
@@ -64,45 +145,25 @@ func (c *Cache) TotalSize() int64 {
 	return c.totalSize
 }
 
-// Get fetches the key's value from the cache.
-// The ok result will be true if the item was found.
-func (c *Cache) Get(key string) (value d.APIImages, ok bool) {
+func (c *Cache) OverFilled() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if ele, hit := c.cache[key]; hit {
-		c.ll.MoveToFront(ele)
-		return ele.Value.(*entry).value, true
-	}
-	return
+	return c.totalSize < c.maxSize
 }
 
-// RemoveOldest removes the oldest item in the cache and returns its key and value.
-// If the cache is empty, the empty string and nil are returned.
-func (c *Cache) RemoveOldest() (key string, value d.APIImages) {
-	c.mu.Lock()
-	k, v := c.removeOldest()
-	c.mu.Unlock()
-	c.onEvict(v)
-	return k, v
-}
-
-// note: must hold c.mu
-func (c *Cache) removeOldest() (key string, value d.APIImages) {
-	ele := c.ll.Back()
-	if ele == nil {
-		return
+func (c *Cache) Evictable() (ea EntryByAge) {
+	for _, i := range c.cache {
+		if i.locked == false {
+			ea = append(ea, i)
+		}
 	}
-	c.ll.Remove(ele)
-	ent := ele.Value.(*entry)
-	c.totalSize -= value.Size
-	delete(c.cache, ent.key)
-	return ent.key, ent.value
-
+	sort.Sort(ea)
+	return ea
 }
 
 // Len returns the number of items in the cache.
 func (c *Cache) Len() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.ll.Len()
+	return len(c.cache)
 }

@@ -110,7 +110,7 @@ func NewConfig() (*Config, error) {
 		MaxCallEndStacking: 8192,
 		PreForkImage:       "busybox",
 		PreForkCmd:         "tail -f /dev/null",
-		MaxImageCacheSize:  20 * 1024 * 1024,
+		MaxImageCacheSize:  2000 * 1024 * 1024,
 	}
 
 	var err error

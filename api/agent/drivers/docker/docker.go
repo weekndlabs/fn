@@ -54,42 +54,58 @@ func (r *runResult) Error() error   { return r.err }
 func (r *runResult) Status() string { return r.status }
 
 type DockerDriver struct {
-	conf     drivers.Config
-	docker   dockerClient // retries on *docker.Client, restricts ad hoc *docker.Client usage / retries
-	hostname string
-	auths    map[string]driverAuthConfig
-	pool     DockerPool
-	imageLRU *Cache
+	conf       drivers.Config
+	docker     dockerClient // retries on *docker.Client, restricts ad hoc *docker.Client usage / retries
+	hostname   string
+	auths      map[string]driverAuthConfig
+	pool       DockerPool
+	imageCache *Cache
 	// protects networks map
 	networksLock sync.Mutex
 	networks     map[string]uint64
 }
 
-func NewImageCleaner(dockerDriver *DockerDriver, toEvict <-chan docker.APIImages) error {
+func NewImageCleaner(dockerDriver *DockerDriver, context context.Context) error {
 	opts := docker.RemoveImageOptions{}
-	opts.Force = false
+	opts.Force = true
 	opts.NoPrune = false
-	opts.Context = context.Background()
-	rateLimiter := time.NewTimer(time.Second)
-	for i := range toEvict {
-		<-rateLimiter.C
+	opts.Context = context
+	timer := time.NewTimer(time.Minute * 5)
+	for {
+		select {
+		case <-context.Done():
+			{
+				return nil
+			}
+		case <-timer.C:
+			{
+				if !dockerDriver.imageCache.OverFilled() {
+					continue
+				}
+				toEvict := dockerDriver.imageCache.Evictable()
+				for _, i := range toEvict {
+					err := dockerDriver.docker.RemoveImage(i.image.ID, opts)
+					if err != nil {
+						logrus.WithError(err).Errorf("Could not remove image: %v because: %v", i, err)
+					} else {
+						dockerDriver.imageCache.Remove(i.image)
+					}
+				}
+				timer.Reset(time.Minute * 5)
+			}
 
-		err := dockerDriver.docker.RemoveImage(i.ID, opts)
-		rateLimiter.Reset(time.Second)
-		if err != nil {
-			logrus.WithError(err).Errorf("Could not remove image: %v because: %v", i.ID, err)
-			dockerDriver.imageLRU.Add(i.ID, i)
 		}
-	}
 
-	return nil
+	}
 }
 
-func OnImageEvict(toEvict chan docker.APIImages) ImageEvictor {
-	return func(img docker.APIImages) error {
-		toEvict <- img
-		return nil
+func Contains(coll []docker.APIImages, item docker.APIImages) bool {
+	for _, image := range coll {
+		if image.ID == item.ID {
+			return true
+		}
 	}
+	return false
 }
 
 // implements drivers.Driver
@@ -130,12 +146,19 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 		}
 	}
 
-	imageEvictChan := make(chan docker.APIImages, 10)
-	onEvictor := OnImageEvict(imageEvictChan)
-	go NewImageCleaner(driver, imageEvictChan)
+	go NewImageCleaner(driver, context.Background())
 
 	logrus.Infof("Max cache size: %v\n", conf.MaxImageCacheSize)
-	driver.imageLRU = NewLRU(int64(conf.MaxImageCacheSize), onEvictor)
+	driver.imageCache = NewCache(int64(conf.MaxImageCacheSize))
+
+	imagesBeforeLoad, err := driver.docker.ListImages(context.Background())
+
+	if conf.DockerLoadFile != "" {
+		err = loadDockerImages(driver, conf.DockerLoadFile)
+		if err != nil {
+			logrus.WithError(err).Fatalf("cannot load docker images in %s", conf.DockerLoadFile)
+		}
+	}
 
 	go func() {
 		images, err := driver.docker.ListImages(context.Background())
@@ -143,15 +166,13 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 			logrus.WithError(err).Fatalf("cannot list docker images %s", err)
 		}
 		for _, i := range images {
-			driver.imageLRU.Add(i.ID, i)
+			if Contains(imagesBeforeLoad, i) {
+				driver.imageCache.Add(i)
+			} else {
+				driver.imageCache.Lock(i.ID)
+			}
 		}
 	}()
-	if conf.DockerLoadFile != "" {
-		err = loadDockerImages(driver, conf.DockerLoadFile)
-		if err != nil {
-			logrus.WithError(err).Fatalf("cannot load docker images in %s", conf.DockerLoadFile)
-		}
-	}
 
 	return driver
 }
@@ -253,6 +274,7 @@ func (drv *DockerDriver) unpickNetwork(c *cookie) {
 
 func (drv *DockerDriver) CreateCookie(ctx context.Context, task drivers.ContainerTask) (drivers.Cookie, error) {
 
+	drv.imageCache.Lock(task.Image())
 	ctx, log := common.LoggerWithFields(ctx, logrus.Fields{"stack": "CreateCookie"})
 
 	opts := docker.CreateContainerOptions{
@@ -415,7 +437,7 @@ func (drv *DockerDriver) run(ctx context.Context, container string, task drivers
 	attachSuccess := make(chan struct{})
 	mwOut, mwErr := task.Logger()
 
-	drv.imageLRU.Get(container)
+	drv.imageCache.Mark(container)
 
 	waiter, err := drv.docker.AttachToContainerNonBlocking(ctx, docker.AttachToContainerOptions{
 		Success:      attachSuccess,

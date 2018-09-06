@@ -79,6 +79,8 @@ func setUpSystem() (*state, error) {
 	state.memory = os.Getenv(agent.EnvMaxTotalMemory)
 	os.Setenv(agent.EnvMaxTotalMemory, strconv.FormatUint(256*1024*1024, 10))
 
+	os.Setenv(agent.EnvMaxImageCacheSize, strconv.FormatUint(1000*1024*1024, 10))
+
 	pr0, err := SetUpPureRunnerNode(ctx, 0)
 	if err != nil {
 		return state, err
@@ -258,7 +260,6 @@ func SetUpPureRunnerNode(ctx context.Context, nodeNum int) (*server.Server, erro
 
 	// This is our Agent config, which we will use for both inner agent and docker.
 	cfg, err := agent.NewConfig()
-	cfg.MaxImageCacheSize = 1024 * 1024 * 1024
 	if err != nil {
 		return nil, err
 	}
