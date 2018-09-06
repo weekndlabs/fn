@@ -116,31 +116,30 @@ func (c *Cache) lock(ID string, key interface{}) error {
 	return errors.New("Image not found in cache")
 }
 
-func (c *Cache) Locked(value d.APIImages) (bool, error) {
+func (c *Cache) Locked(ID string) (bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.locked(value)
+	return c.locked(ID)
 }
 
-func (c *Cache) locked(value d.APIImages) (bool, error) {
+func (c *Cache) locked(ID string) (bool, error) {
 	for _, i := range c.cache {
-		if i.image.ID == value.ID {
+		if i.image.ID == ID {
 			return len(i.locked) > 0, nil
 		}
 	}
 	return false, errors.New("Image not found in cache")
 }
 
-func (c *Cache) Unlock(value d.APIImages, key interface{}) {
+func (c *Cache) Unlock(ID string, key interface{}) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.unlock(value, key)
-
+	c.unlock(ID, key)
 }
 
-func (c *Cache) unlock(value d.APIImages, key interface{}) {
+func (c *Cache) unlock(ID string, key interface{}) {
 	for _, i := range c.cache {
-		if i.image.ID == value.ID {
+		if i.image.ID == ID {
 			delete(i.locked, &key)
 		}
 	}
@@ -157,19 +156,15 @@ func (c *Cache) Add(value d.APIImages) {
 		return
 	}
 	c.cache = append(c.cache, NewEntry(value))
-	c.totalSize += value.Size
 }
 
 func (c *Cache) TotalSize() int64 {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.totalSize
+	d.Dsi
 }
 
 func (c *Cache) OverFilled() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.totalSize < c.maxSize
 }
 func (c *Cache) Evictable() EntryByAge {
 	c.mu.Lock()

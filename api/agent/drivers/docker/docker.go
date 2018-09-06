@@ -145,8 +145,6 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 		}
 	}
 
-	go NewImageCleaner(driver, context.Background())
-
 	logrus.Infof("Max cache size: %v\n", conf.MaxImageCacheSize)
 	driver.imageCache = NewCache(int64(conf.MaxImageCacheSize))
 
@@ -168,10 +166,12 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 			if Contains(imagesBeforeLoad, i) {
 				driver.imageCache.Add(i)
 			} else {
-				driver.imageCache.Lock(i.ID)
+				driver.imageCache.Lock(i.ID, "baseimage")
 			}
 		}
 	}()
+
+	go NewImageCleaner(driver, context.Background())
 
 	return driver
 }
@@ -273,7 +273,6 @@ func (drv *DockerDriver) unpickNetwork(c *cookie) {
 
 func (drv *DockerDriver) CreateCookie(ctx context.Context, task drivers.ContainerTask) (drivers.Cookie, error) {
 
-	drv.imageCache.Lock(task.Image())
 	ctx, log := common.LoggerWithFields(ctx, logrus.Fields{"stack": "CreateCookie"})
 
 	opts := docker.CreateContainerOptions{
@@ -298,6 +297,8 @@ func (drv *DockerDriver) CreateCookie(ctx context.Context, task drivers.Containe
 		task: task,
 		drv:  drv,
 	}
+
+	drv.imageCache.Lock(task.Image(), cookie)
 
 	cookie.configureLogger(log)
 	cookie.configureMem(log)
