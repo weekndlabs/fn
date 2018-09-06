@@ -20,7 +20,7 @@ type Cache struct {
 
 type Entry struct {
 	lastUsed time.Time
-	locked   bool
+	locked   map[*interface{}]*interface{}
 	uses     int64
 	image    d.APIImages
 }
@@ -39,7 +39,7 @@ func (a EntryByAge) Less(i, j int) bool { return a[i].Score() < a[j].Score() }
 func NewEntry(value d.APIImages) Entry {
 	return Entry{
 		lastUsed: time.Now(),
-		locked:   false,
+		locked:   make(map[*interface{}]*interface{}),
 		uses:     0,
 		image:    value}
 }
@@ -100,16 +100,16 @@ func (c *Cache) Remove(value d.APIImages) error {
 	return errors.New("Image not found in cache")
 }
 
-func (c *Cache) Lock(ID string) error {
+func (c *Cache) Lock(ID string, key interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.lock(ID)
+	return c.lock(ID, key)
 }
 
-func (c *Cache) lock(ID string) error {
+func (c *Cache) lock(ID string, key interface{}) error {
 	for _, i := range c.cache {
 		if i.image.ID == ID {
-			i.locked = true
+			i.locked[&key] = &key
 			return nil
 		}
 	}
@@ -125,23 +125,23 @@ func (c *Cache) Locked(value d.APIImages) (bool, error) {
 func (c *Cache) locked(value d.APIImages) (bool, error) {
 	for _, i := range c.cache {
 		if i.image.ID == value.ID {
-			return i.locked, nil
+			return len(i.locked) > 0, nil
 		}
 	}
 	return false, errors.New("Image not found in cache")
 }
 
-func (c *Cache) Unlock(value d.APIImages) {
+func (c *Cache) Unlock(value d.APIImages, key interface{}) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.unlock(value)
+	c.unlock(value, key)
 
 }
 
-func (c *Cache) unlock(value d.APIImages) {
+func (c *Cache) unlock(value d.APIImages, key interface{}) {
 	for _, i := range c.cache {
 		if i.image.ID == value.ID {
-			i.locked = false
+			remove(i.locked, key)
 		}
 	}
 }
