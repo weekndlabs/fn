@@ -271,7 +271,7 @@ func (d *dockerWrap) RemoveImage(image string, opts docker.RemoveImageOptions) (
 
 	logger := common.Logger(ctx).WithField("docker_cmd", "RemoveImage")
 	err = d.retry(ctx, logger, func() error {
-		err = d.RemoveImageExtended(image, opts)
+		err = d.RemoveImage(image, opts)
 		return err
 	})
 	return err

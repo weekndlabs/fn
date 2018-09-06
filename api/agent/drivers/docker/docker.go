@@ -166,6 +166,7 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 				if Contains(imagesBeforeLoad, i) {
 					driver.imageCache.Add(i)
 				} else {
+					driver.imageCache.Add(i)
 					driver.imageCache.Lock(i.ID, "baseimage")
 				}
 			}
@@ -299,7 +300,9 @@ func (drv *DockerDriver) CreateCookie(ctx context.Context, task drivers.Containe
 		drv:  drv,
 	}
 
-	drv.imageCache.Lock(task.Image(), cookie)
+	if drv.imageCache != nil {
+		drv.imageCache.Lock(task.Image(), cookie)
+	}
 
 	cookie.configureLogger(log)
 	cookie.configureMem(log)

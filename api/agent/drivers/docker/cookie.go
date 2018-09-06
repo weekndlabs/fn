@@ -189,7 +189,9 @@ func (c *cookie) Close(ctx context.Context) error {
 	err := c.drv.removeContainer(ctx, c.task.Id())
 	c.drv.unpickPool(c)
 	c.drv.unpickNetwork(c)
-	c.drv.imageCache.Unlock(c.task.Image(), c)
+	if c.drv.imageCache != nil {
+		c.drv.imageCache.Unlock(c.task.Image(), c)
+	}
 	return err
 }
 

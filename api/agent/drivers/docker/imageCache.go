@@ -48,6 +48,7 @@ func NewEntry(value d.APIImages) Entry {
 func NewCache(maxSize int64) *Cache {
 	return &Cache{
 		cache: make(EntryByAge, 0),
+		mu:    sync.Mutex{},
 	}
 }
 
