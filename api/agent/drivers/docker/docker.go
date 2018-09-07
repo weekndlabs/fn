@@ -70,7 +70,7 @@ func NewImageCleaner(dockerDriver *DockerDriver, context context.Context) error 
 	opts.Force = true
 	opts.NoPrune = false
 	opts.Context = context
-	ticker := time.NewTicker(time.Minute * 5)
+	ticker := time.NewTicker(dockerDriver.conf.ImageCacheCleanInterval)
 	for {
 		select {
 		case <-context.Done():
@@ -79,16 +79,15 @@ func NewImageCleaner(dockerDriver *DockerDriver, context context.Context) error 
 			}
 		case <-ticker.C:
 			{
-				if !dockerDriver.imageCache.OverFilled() {
-					continue
-				}
-				toEvict := dockerDriver.imageCache.Evictable()
-				for _, i := range toEvict {
-					err := dockerDriver.docker.RemoveImage(i.image.ID, opts)
-					if err != nil {
-						logrus.WithError(err).Errorf("Could not remove image: %v because: %v", i, err)
-					} else {
-						dockerDriver.imageCache.Remove(i.image)
+				if dockerDriver.imageCache.OverFilled() {
+					toEvict := dockerDriver.imageCache.Evictable()
+					for _, i := range toEvict {
+						err := dockerDriver.docker.RemoveImage(i.image.ID, opts)
+						if err != nil {
+							logrus.WithError(err).Errorf("Could not remove image: %v because: %v", i, err)
+						} else {
+							dockerDriver.imageCache.Remove(i.image)
+						}
 					}
 				}
 			}

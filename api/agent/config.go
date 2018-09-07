@@ -36,6 +36,7 @@ type Config struct {
 	DisableTini             bool          `json:"disable_tini"`
 	DisableDebugUserLogs    bool          `json:"disable_debug_user_logs"`
 	MaxImageCacheSize       uint64        `json:"max_image_cache_size"`
+	ImageCacheCleanInterval time.Duration `json:"image_cache_clean_interval"`
 }
 
 const (
@@ -85,13 +86,15 @@ const (
 	// EnvMaxTmpFsInodes is the maximum number of inodes for /tmp in a container
 	EnvMaxTmpFsInodes = "FN_MAX_TMPFS_INODES"
 	// EnvDisableReadOnlyRootFs makes the root fs for a container have rw permissions, by default it is read only
-	EnvDisableReadOnlyRootFs = "FN_DISABLE_READONLY_ROOTFS"
-	// EnvDisableTini runs containers without using the --init option, for tini pid 1 action
+	EnvDisableReadOnlyRootFs = "FN_DISABLE_READONLY_ROOTFS" // EnvDisableTini runs containers without using the --init option, for tini pid 1 action
+
 	EnvDisableTini = "FN_DISABLE_TINI"
 	// EnvDisableDebugUserLogs disables user function logs being logged at level debug. wise to enable for production.
 	EnvDisableDebugUserLogs = "FN_DISABLE_DEBUG_USER_LOGS"
-	// EnvMaxImageCacheSize
+	// EnvMaxImageCacheSize how large the image cache is allowed to report before cleaning is triggered.
 	EnvMaxImageCacheSize = "FN_MAX_IMAGE_CACHE_SIZE"
+	// EnvImageCacheCleanInterval How often the image cache cleans.
+	EnvImageCacheCleanInterval = "FN_IMAGE_CACHE_CLEAN_INTERVAL"
 	// MaxMsDisabled is used to determine whether mr freeze is lying in wait. TODO remove this manuever
 	MaxMsDisabled = time.Duration(math.MaxInt64)
 
@@ -105,12 +108,13 @@ const (
 func NewConfig() (*Config, error) {
 
 	cfg := &Config{
-		MinDockerVersion:   "17.10.0-ce",
-		MaxLogSize:         1 * 1024 * 1024,
-		MaxCallEndStacking: 8192,
-		PreForkImage:       "busybox",
-		PreForkCmd:         "tail -f /dev/null",
-		MaxImageCacheSize:  0,
+		MinDockerVersion:        "17.10.0-ce",
+		MaxLogSize:              1 * 1024 * 1024,
+		MaxCallEndStacking:      8192,
+		PreForkImage:            "busybox",
+		PreForkCmd:              "tail -f /dev/null",
+		MaxImageCacheSize:       0,
+		ImageCacheCleanInterval: 0,
 	}
 
 	var err error
@@ -121,6 +125,7 @@ func NewConfig() (*Config, error) {
 	err = setEnvMsecs(err, EnvHotLauncherTimeout, &cfg.HotLauncherTimeout, time.Duration(60)*time.Minute)
 	err = setEnvMsecs(err, EnvAsyncChewPoll, &cfg.AsyncChewPoll, time.Duration(60)*time.Second)
 	err = setEnvMsecs(err, EnvCallEndTimeout, &cfg.CallEndTimeout, time.Duration(10)*time.Minute)
+	err = setEnvMsecs(err, EnvImageCacheCleanInterval, &cfg.ImageCacheCleanInterval, time.Duration(5)*time.Minute)
 	err = setEnvUint(err, EnvMaxResponseSize, &cfg.MaxResponseSize)
 	err = setEnvUint(err, EnvMaxLogSize, &cfg.MaxLogSize)
 	err = setEnvUint(err, EnvMaxTotalCPU, &cfg.MaxTotalCPU)
@@ -129,6 +134,7 @@ func NewConfig() (*Config, error) {
 	err = setEnvUint(err, EnvPreForkPoolSize, &cfg.PreForkPoolSize)
 	err = setEnvUint(err, EnvMaxCallEndStacking, &cfg.MaxCallEndStacking)
 	err = setEnvUint(err, EnvMaxImageCacheSize, &cfg.MaxImageCacheSize)
+
 	err = setEnvStr(err, EnvPreForkImage, &cfg.PreForkImage)
 	err = setEnvStr(err, EnvPreForkCmd, &cfg.PreForkCmd)
 	err = setEnvUint(err, EnvPreForkUseOnce, &cfg.PreForkUseOnce)
