@@ -156,8 +156,8 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 	if conf.MaxImageCacheSize != 0 {
 		driver.imageCache = NewCache(int64(conf.MaxImageCacheSize))
 
-		go func() {
-			images, err := driver.docker.ListImages(context.Background())
+		go func(context context.Context) {
+			images, err := driver.docker.ListImages(context)
 			if err != nil {
 				logrus.WithError(err).Fatalf("cannot list docker images %s", err)
 			}
@@ -169,7 +169,7 @@ func NewDocker(conf drivers.Config) *DockerDriver {
 					driver.imageCache.Lock(i.ID, "baseimage")
 				}
 			}
-		}()
+		}(context.Background())
 
 		go NewImageCleaner(driver, context.Background())
 	}
